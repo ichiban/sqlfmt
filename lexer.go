@@ -36,8 +36,7 @@ func NewLexer(input string) *Lexer {
 }
 
 func (l *Lexer) Next() token {
-	t := <-l.tokens
-	return t
+	return <-l.tokens
 }
 
 func (l *Lexer) next() (rune, int) {
@@ -93,6 +92,9 @@ const (
 	lessThanOperator
 	equalsOperator
 	greaterThanOperator
+	notEqualsOperator
+	greaterThanOrEqualsOperator
+	lessThanOrEqualsOperator
 )
 
 func (t tokenType) String() string {
@@ -131,6 +133,12 @@ func (t tokenType) String() string {
 		return "equals operator"
 	case greaterThanOperator:
 		return "greater than operator"
+	case notEqualsOperator:
+		return "not equals operator"
+	case greaterThanOrEqualsOperator:
+		return "greater than or equals operator"
+	case lessThanOrEqualsOperator:
+		return "less than or equals operator"
 	default:
 		return "unknown"
 	}
@@ -276,17 +284,46 @@ func (l *Lexer) specialChar() state {
 			l.emit(token{typ: semicolon, val: v})
 			return l.start()
 		case '<':
-			l.emit(token{typ: lessThanOperator, val: v})
-			return l.start()
+			return l.lessThanOperator(pos)
 		case '=':
 			l.emit(token{typ: equalsOperator, val: v})
 			return l.start()
 		case '>':
-			l.emit(token{typ: greaterThanOperator, val: v})
-			return l.start()
+			return l.greaterThanOperator(pos)
 		default:
 			l.emit(token{typ: errToken})
 			return nil
+		}
+	}
+}
+
+func (l *Lexer) lessThanOperator(start int) state {
+	return func(r rune, pos int) state {
+		switch r {
+		case '>':
+			l.emit(token{typ: notEqualsOperator, val: l.input[start : pos+1]})
+			return l.start()
+		case '=':
+			l.emit(token{typ: lessThanOrEqualsOperator, val: l.input[start : pos+1]})
+			return l.start()
+		default:
+			l.backup()
+			l.emit(token{typ: lessThanOperator, val: l.input[start:pos]})
+			return l.start()
+		}
+	}
+}
+
+func (l *Lexer) greaterThanOperator(start int) state {
+	return func(r rune, pos int) state {
+		switch r {
+		case '=':
+			l.emit(token{typ: greaterThanOrEqualsOperator, val: l.input[start : pos+1]})
+			return l.start()
+		default:
+			l.backup()
+			l.emit(token{typ: greaterThanOperator, val: l.input[start:pos]})
+			return l.start()
 		}
 	}
 }

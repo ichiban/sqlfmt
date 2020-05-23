@@ -14,31 +14,43 @@ func TestParser_DirectSQLStatement(t *testing.T) {
 		Concentrated: true,
 		Left: Stack{
 			Up: Juxtaposition{
-				Left:  Atom("SELECT"),
-				Right: Atom("model_num"),
+				Concentrated: false,
+				Left:         Atom("SELECT"),
+				Right:        Atom("model_num"),
 			},
 			Down: Stack{
 				Up: Juxtaposition{
-					Left: Atom("FROM"),
+					Concentrated: false,
+					Left:         Atom("FROM"),
 					Right: Juxtaposition{
-						Left: Atom("phones"),
+						Concentrated: false,
+						Left:         Atom("phones"),
 						Right: Juxtaposition{
-							Left:  Atom("AS"),
-							Right: Atom("p"),
+							Concentrated: false,
+							Left:         Atom("AS"),
+							Right:        Atom("p"),
 						},
 					},
 				},
 				Down: Juxtaposition{
-					Left: Juxtaposition{
-						Left: Atom("p"),
-						Right: Juxtaposition{
-							Left:  Atom("."),
-							Right: Atom("release_date"),
-						},
-					},
+					Concentrated: false,
+					Left:         Atom("WHERE"),
 					Right: Juxtaposition{
-						Left:  Atom(">"),
-						Right: Atom("'2014-09-30'"),
+						Concentrated: false,
+						Left: Juxtaposition{
+							Concentrated: true,
+							Left:         Atom("p"),
+							Right: Juxtaposition{
+								Concentrated: true,
+								Left:         Atom("."),
+								Right:        Atom("release_date"),
+							},
+						},
+						Right: Juxtaposition{
+							Concentrated: false,
+							Left:         Atom(">"),
+							Right:        Atom("'2014-09-30'"),
+						},
 					},
 				},
 			},
