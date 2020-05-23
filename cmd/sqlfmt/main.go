@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 
@@ -9,28 +10,51 @@ import (
 )
 
 func main() {
-	b, err := ioutil.ReadAll(os.Stdin)
+	for _, p := range os.Args[1:] {
+		if err := format(p); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func format(s string) error {
+	f, err := open(s)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	defer f.Close()
+
+	b, err := ioutil.ReadAll(f)
+	if err != nil {
+		return err
 	}
 
 	p := sqlfmt.NewParser(string(b))
 
 	l, err := p.DirectSQLStatement()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	l, err = sqlfmt.AlignGutter(l)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if err := l.Write(os.Stdout, 0); err != nil {
-		panic(err)
+		return err
 	}
 
 	if _, err := fmt.Println(); err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
+}
+
+func open(s string) (io.ReadCloser, error) {
+	if s == "-" {
+		return ioutil.NopCloser(os.Stdin), nil
+	}
+	return os.Open(s)
 }
