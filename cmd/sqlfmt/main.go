@@ -11,45 +11,39 @@ import (
 
 func main() {
 	for _, p := range os.Args[1:] {
-		if err := format(p); err != nil {
+		s, err := sql(p)
+		if err != nil {
+			panic(err)
+		}
+
+		f, err := sqlfmt.Format(s)
+		if err != nil {
+			panic(err)
+		}
+
+		if _, err = fmt.Print(f); err != nil {
 			panic(err)
 		}
 	}
 }
 
-func format(s string) error {
-	f, err := open(s)
+func sql(p string) (string, error) {
+	var r io.Reader
+	if p == "-" {
+		r = os.Stdin
+	} else {
+		f, err := os.Open(p)
+		if err != nil {
+			return "", err
+		}
+		defer f.Close()
+		r = f
+	}
+
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	b, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
+		return "", nil
 	}
 
-	p := sqlfmt.NewParser(string(b))
-
-	l, err := p.DirectSQLStatement()
-	if err != nil {
-		return err
-	}
-
-	if err := l.Write(os.Stdout, 0); err != nil {
-		return err
-	}
-
-	if _, err := fmt.Println(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func open(s string) (io.ReadCloser, error) {
-	if s == "-" {
-		return ioutil.NopCloser(os.Stdin), nil
-	}
-	return os.Open(s)
+	return string(b), nil
 }
