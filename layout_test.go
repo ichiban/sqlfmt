@@ -18,8 +18,8 @@ func TestLayout(t *testing.T) {
 
 	t.Run("stack", func(t *testing.T) {
 		l := Stack{
-			Up:   Atom("Lorem ipsum dolor"),
-			Down: Atom("consectetur adipiscing elit"),
+			Atom("Lorem ipsum dolor"),
+			Atom("consectetur adipiscing elit"),
 		}
 
 		var b bytes.Buffer
@@ -30,13 +30,13 @@ consectetur adipiscing elit`, b.String())
 
 	t.Run("juxtaposition", func(t *testing.T) {
 		l := Juxtaposition{
-			Left: Stack{
-				Up:   Atom("Lorem ipsum dolor"),
-				Down: Atom("consectetur adipiscing elit"),
+			Stack{
+				Atom("Lorem ipsum dolor"),
+				Atom("consectetur adipiscing elit"),
 			},
-			Right: Stack{
-				Up:   Atom("Aliquam erat volutpat"),
-				Down: Atom("condimentum vitae leo sit"),
+			Stack{
+				Atom("Aliquam erat volutpat"),
+				Atom("condimentum vitae leo sit"),
 			},
 		}
 
@@ -48,13 +48,12 @@ consectetur adipiscing elit Aliquam erat volutpat
 	})
 
 	t.Run("if", func(t *testing.T) {
-		l := Juxtaposition{
-			Concentrated: true,
-			Left: Stack{
-				Up:   Atom("if (voltage[t] < LOW_THRESHOLD)"),
-				Down: Atom("    "),
+		l := Concatenation{
+			Stack{
+				Atom("if (voltage[t] < LOW_THRESHOLD)"),
+				Atom("    "),
 			},
-			Right: Atom("LogLowVoltage(voltage[t])"),
+			Atom("LogLowVoltage(voltage[t])"),
 		}
 
 		var b bytes.Buffer

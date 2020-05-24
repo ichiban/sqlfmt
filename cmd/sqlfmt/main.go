@@ -36,11 +36,6 @@ func format(s string) error {
 		return err
 	}
 
-	l, err = sqlfmt.AlignGutter(l)
-	if err != nil {
-		return err
-	}
-
 	if err := l.Write(os.Stdout, 0); err != nil {
 		return err
 	}

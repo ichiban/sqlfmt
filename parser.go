@@ -23,14 +23,11 @@ func (p *Parser) DirectSQLStatement() (Layout, error) {
 		return nil, fmt.Errorf("directly executable statement: %w", err)
 	}
 
-	if _, err := p.accept(semicolon); err != nil {
+	a, err := p.accept(semicolon)
+	if err != nil {
 		return nil, err
 	}
-	return Juxtaposition{
-		Concentrated: true,
-		Left:         s,
-		Right:        Atom(";"),
-	}, nil
+	return Concatenation{s, a}, nil
 }
 
 func (p *Parser) directlyExecutableStatement() (Layout, error) {
@@ -46,28 +43,29 @@ func (p *Parser) queryExpression() (Layout, error) {
 }
 
 func (p *Parser) queryExpressionBody() (Layout, error) {
+	s := Stack{}
+
 	q, err := p.queryTerm()
 	if err != nil {
 		return nil, fmt.Errorf("query term: %w", err)
 	}
+	s.Append(q)
 
 	for {
-		v, err := p.accept(keyword, "UNION", "EXCEPT")
+		j := Juxtaposition{}
+
+		k, err := p.accept(keyword, "UNION", "EXCEPT")
 		if err != nil {
 			break
 		}
-		u := Layout(Atom(v))
-		if v, err := p.accept(keyword, "ALL", "DISTINCT"); err == nil {
-			u = Juxtaposition{
-				Left:  u,
-				Right: Atom(v),
-			}
+		j.Append(k)
+
+		if k, err := p.accept(keyword, "ALL", "DISTINCT"); err == nil {
+			j.Append(k)
 		}
+
 		if c, err := p.correspondingSpec(); err == nil {
-			u = Juxtaposition{
-				Left:  u,
-				Right: c,
-			}
+			j.Append(c)
 		}
 
 		t, err := p.queryTerm()
@@ -75,16 +73,10 @@ func (p *Parser) queryExpressionBody() (Layout, error) {
 			return nil, err
 		}
 
-		q = Stack{
-			Up: q,
-			Down: Stack{
-				Up:   u,
-				Down: t,
-			},
-		}
+		s.Append(j, t)
 	}
 
-	return q, nil
+	return s, nil
 }
 
 func (p *Parser) queryTerm() (Layout, error) {
@@ -96,22 +88,19 @@ func (p *Parser) queryPrimary() (Layout, error) {
 		return s, nil
 	}
 
+	c := Concatenation{}
+
 	v, err := p.accept(leftParen)
 	if err != nil {
 		return nil, err
 	}
-
-	l := Layout(Atom(v))
+	c.Append(v)
 
 	b, err := p.queryExpressionBody()
 	if err != nil {
 		return nil, fmt.Errorf("query expression body: %w", err)
 	}
-	l = Juxtaposition{
-		Concentrated: true,
-		Left:         l,
-		Right:        b,
-	}
+	c.Append(b)
 
 	// TODO: order by clause, result offset clause, fetch first clause
 
@@ -119,12 +108,9 @@ func (p *Parser) queryPrimary() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.Append(v)
 
-	return Juxtaposition{
-		Concentrated: true,
-		Left:         l,
-		Right:        Atom(v),
-	}, nil
+	return c, nil
 }
 
 func (p *Parser) simpleTable() (Layout, error) {
@@ -132,38 +118,41 @@ func (p *Parser) simpleTable() (Layout, error) {
 }
 
 func (p *Parser) correspondingSpec() (Layout, error) {
+	j := Juxtaposition{}
+
 	v, err := p.accept(keyword, "CORRESPONDING")
 	if err != nil {
 		return nil, err
 	}
-
-	c := Layout(Atom(v))
+	j.Append(v)
 
 	if v, err := p.accept(keyword, "BY"); err == nil {
-		c = Juxtaposition{
-			Left:  c,
-			Right: Atom(v),
-		}
+		j.Append(v)
 
-		if _, err := p.accept(leftParen); err != nil {
+		c := Concatenation{}
+
+		v, err = p.accept(leftParen)
+		if err != nil {
 			return nil, err
 		}
+		c.Append(v)
 
 		l, err := p.correspondingColumnList()
 		if err != nil {
 			return nil, err
 		}
-		c = Juxtaposition{
-			Left:  c,
-			Right: l,
-		}
+		c.Append(l)
 
-		if _, err := p.accept(rightParen); err != nil {
+		v, err = p.accept(rightParen)
+		if err != nil {
 			return nil, err
 		}
+		c.Append(v)
+
+		j.Append(c)
 	}
 
-	return c, nil
+	return j, nil
 }
 
 func (p *Parser) correspondingColumnList() (Layout, error) {
@@ -171,33 +160,39 @@ func (p *Parser) correspondingColumnList() (Layout, error) {
 }
 
 func (p *Parser) querySpecification() (Layout, error) {
-	if _, err := p.accept(keyword, "SELECT"); err != nil {
-		return nil, err
+	j := Juxtaposition{}
+	{
+		v, err := p.accept(keyword, "SELECT")
+		if err != nil {
+			return nil, err
+		}
+		j.Append(v)
+
+		s, err := p.selectList()
+		if err != nil {
+			return nil, fmt.Errorf("select list: %w", err)
+		}
+		j.Append(s)
 	}
 
-	s, err := p.selectList()
-	if err != nil {
-		return nil, fmt.Errorf("select list: %w", err)
-	}
+	s := Stack{}
+	s.Append(j)
 
 	t, err := p.tableExpression()
 	if err != nil {
 		return nil, fmt.Errorf("table list: %w", err)
 	}
+	s.Append(t)
 
-	return Stack{
-		Up: Juxtaposition{
-			Left:  Atom("SELECT"),
-			Right: s,
-		},
-		Down: t,
-	}, nil
+	return s, nil
 }
 
 func (p *Parser) selectList() (Layout, error) {
-	if _, err := p.accept(asterisk); err == nil {
-		return Atom("*"), nil
+	if v, err := p.accept(asterisk); err == nil {
+		return v, nil
 	}
+
+	j := Juxtaposition{}
 
 	s, err := p.selectSublist()
 	if err != nil {
@@ -205,22 +200,20 @@ func (p *Parser) selectList() (Layout, error) {
 	}
 
 	for {
-		if _, err := p.accept(comma); err != nil {
+		v, err := p.accept(comma)
+		if err != nil {
 			break
 		}
+		j.Append(Concatenation{s, v})
 
-		n, err := p.selectSublist()
+		s, err = p.selectSublist()
 		if err != nil {
 			return nil, fmt.Errorf("select sublist: %w", err)
 		}
-
-		s = Juxtaposition{
-			Left:  s,
-			Right: n,
-		}
 	}
+	j.Append(s)
 
-	return s, nil
+	return j, nil
 }
 
 func (p *Parser) selectSublist() (Layout, error) {
@@ -228,40 +221,35 @@ func (p *Parser) selectSublist() (Layout, error) {
 }
 
 func (p *Parser) derivedColumn() (Layout, error) {
+	j := Juxtaposition{}
+
 	v, err := p.valueExpression()
 	if err != nil {
 		return nil, fmt.Errorf("value expression: %w", err)
 	}
+	j.Append(v)
 
 	if a, err := p.asClause(); err == nil {
-		v = Juxtaposition{
-			Left:  v,
-			Right: a,
-		}
+		j.Append(a)
 	}
 
-	return v, nil
+	return j, nil
 }
 
 func (p *Parser) asClause() (Layout, error) {
-	var l Layout
+	j := Juxtaposition{}
+
 	if v, err := p.accept(keyword, "AS"); err == nil {
-		l = Atom(v)
+		j.Append(v)
 	}
 
 	c, err := p.columnName()
 	if err != nil {
 		return nil, fmt.Errorf("column name: %w", err)
 	}
+	j.Append(c)
 
-	if l != nil {
-		c = Juxtaposition{
-			Left:  l,
-			Right: c,
-		}
-	}
-
-	return c, nil
+	return j, nil
 }
 
 func (p *Parser) valueExpression() (Layout, error) {
@@ -320,7 +308,7 @@ func (p *Parser) generalLiteral() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(c), nil
+	return c, nil
 }
 
 func (p *Parser) columnReference() (Layout, error) {
@@ -340,41 +328,33 @@ func (p *Parser) aggregateFunction() (Layout, error) {
 }
 
 func (p *Parser) generalSetFunction() (Layout, error) {
-	l, err := p.setFunctionType()
+	c := Concatenation{}
+
+	f, err := p.setFunctionType()
 	if err != nil {
 		return nil, fmt.Errorf("set function type: %w", err)
 	}
+	c.Append(f)
 
 	v, err := p.accept(leftParen)
 	if err != nil {
 		return nil, err
 	}
-	l = Juxtaposition{
-		Concentrated: true,
-		Left:         l,
-		Right:        Atom(v),
-	}
+	c.Append(v)
 
 	e, err := p.valueExpression()
 	if err != nil {
 		return nil, fmt.Errorf("value expression: %w", err)
 	}
-	l = Juxtaposition{
-		Concentrated: true,
-		Left:         l,
-		Right:        e,
-	}
+	c.Append(e)
 
 	v, err = p.accept(rightParen)
 	if err != nil {
 		return nil, err
 	}
+	c.Append(v)
 
-	return Juxtaposition{
-		Concentrated: true,
-		Left:         l,
-		Right:        Atom(v),
-	}, nil
+	return c, nil
 }
 
 func (p *Parser) setFunctionType() (Layout, error) {
@@ -386,36 +366,33 @@ func (p *Parser) computationalOperation() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) identifierChain() (Layout, error) {
-	l, err := p.identifier()
+	c := Concatenation{}
+
+	i, err := p.identifier()
 	if err != nil {
 		return nil, err
 	}
+	c.Append(c, i)
 
 	for {
-		if _, err := p.accept(period); err != nil {
+		v, err := p.accept(period)
+		if err != nil {
 			break
 		}
+		c.Append(v)
 
 		i, err := p.identifier()
 		if err != nil {
 			return nil, fmt.Errorf("identifier: %w", err)
 		}
-		l = Juxtaposition{
-			Concentrated: true,
-			Left:         l,
-			Right: Juxtaposition{
-				Concentrated: true,
-				Left:         Atom("."),
-				Right:        i,
-			},
-		}
+		c.Append(i)
 	}
 
-	return l, nil
+	return c.Strip(), nil
 }
 
 func (p *Parser) identifier() (Layout, error) {
@@ -431,7 +408,7 @@ func (p *Parser) regularIdentifier() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) referenceValueExpression() (Layout, error) {
@@ -439,65 +416,66 @@ func (p *Parser) referenceValueExpression() (Layout, error) {
 }
 
 func (p *Parser) tableExpression() (Layout, error) {
+	s := Stack{}
+
 	f, err := p.fromClause()
 	if err != nil {
 		return nil, err
 	}
+	s.Append(f)
 
 	if w, err := p.whereClause(); err == nil {
-		f = Stack{
-			Up:   f,
-			Down: w,
-		}
+		s.Append(w)
 	}
 
 	if g, err := p.groupByClause(); err == nil {
-		f = Stack{
-			Up:   f,
-			Down: g,
-		}
+		s.Append(g)
 	}
 
-	return f, nil
+	return s, nil
 }
 
 func (p *Parser) fromClause() (Layout, error) {
-	if _, err := p.accept(keyword, "FROM"); err != nil {
+	j := Juxtaposition{}
+
+	v, err := p.accept(keyword, "FROM")
+	if err != nil {
 		return nil, err
 	}
+	j.Append(v)
+
 	l, err := p.tableReferenceList()
 	if err != nil {
 		return nil, err
 	}
-	return Juxtaposition{
-		Left:  Atom("FROM"),
-		Right: l,
-	}, nil
+	j.Append(l)
+
+	return j, nil
 }
 
 func (p *Parser) tableReferenceList() (Layout, error) {
-	l, err := p.tableReference()
+	j := Juxtaposition{}
+
+	t, err := p.tableReference()
 	if err != nil {
 		return nil, err
 	}
 
 	for {
-		if _, err := p.accept(comma); err != nil {
+		v, err := p.accept(comma)
+		if err != nil {
 			break
 		}
+		j.Append(Concatenation{t, v})
 
-		t, err := p.tableReference()
+		t, err = p.tableReference()
 		if err != nil {
 			return nil, err
 		}
-
-		l = Juxtaposition{
-			Left:  l,
-			Right: t,
-		}
 	}
+	j.Append(t)
 
-	return l, nil
+	return j, nil
 }
 
 func (p *Parser) tableReference() (Layout, error) {
@@ -509,26 +487,25 @@ func (p *Parser) tableFactor() (Layout, error) {
 }
 
 func (p *Parser) tablePrimary() (Layout, error) {
+	j := Juxtaposition{}
+
 	n, err := p.tableOrQueryName()
 	if err != nil {
 		return nil, err
 	}
+	j.Append(n)
 
-	if _, err := p.accept(keyword, "AS"); err == nil {
+	if v, err := p.accept(keyword, "AS"); err == nil {
+		j.Append(v)
+
 		c, err := p.correlationName()
 		if err != nil {
 			return nil, err
 		}
-		n = Juxtaposition{
-			Left: n,
-			Right: Juxtaposition{
-				Left:  Atom("AS"),
-				Right: c,
-			},
-		}
+		j.Append(c)
 	}
 
-	return n, nil
+	return j, nil
 }
 
 func (p *Parser) tableOrQueryName() (Layout, error) {
@@ -536,7 +513,9 @@ func (p *Parser) tableOrQueryName() (Layout, error) {
 }
 
 func (p *Parser) columnNameList() (Layout, error) {
-	l, err := p.columnName()
+	j := Juxtaposition{}
+
+	n, err := p.columnName()
 	if err != nil {
 		return nil, fmt.Errorf("column name: %w", err)
 	}
@@ -546,27 +525,21 @@ func (p *Parser) columnNameList() (Layout, error) {
 		if err != nil {
 			break
 		}
+		j.Append(Concatenation{n, v})
 
-		n, err := p.columnName()
+		n, err = p.columnName()
 		if err != nil {
 			return nil, err
 		}
-
-		l = Juxtaposition{
-			Concentrated: true,
-			Left:         l,
-			Right: Juxtaposition{
-				Left:  Atom(v),
-				Right: n,
-			},
-		}
 	}
+	j.Append(n)
 
-	return l, nil
+	return j, nil
 }
 
 func (p *Parser) whereClause() (Layout, error) {
-	if _, err := p.accept(keyword, "WHERE"); err != nil {
+	v, err := p.accept(keyword, "WHERE")
+	if err != nil {
 		return nil, err
 	}
 
@@ -575,41 +548,46 @@ func (p *Parser) whereClause() (Layout, error) {
 		return nil, fmt.Errorf("search condition: %w", err)
 	}
 
-	return Juxtaposition{
-		Left:  Atom("WHERE"),
-		Right: s,
-	}, nil
+	if l, ok := s.(Stack); ok {
+		j := Juxtaposition{}
+		j.Append(v, l[0])
+		l[0] = j
+		return l, nil
+	} else {
+		j := Juxtaposition{}
+		j.Append(v, s)
+		return j, nil
+	}
 }
 
 func (p *Parser) groupByClause() (Layout, error) {
+	j := Juxtaposition{}
+
 	v, err := p.accept(keyword, "GROUP")
 	if err != nil {
 		return nil, err
 	}
-	l := Layout(Atom(v))
+	j.Append(v)
 
 	v, err = p.accept(keyword, "BY")
 	if err != nil {
 		return nil, err
 	}
-	l = Juxtaposition{
-		Left:  l,
-		Right: Atom(v),
-	}
+	j.Append(v)
 
 	g, err := p.groupingElementList()
 	if err != nil {
 		return nil, fmt.Errorf("grouping element list: %w", err)
 	}
+	j.Append(g)
 
-	return Juxtaposition{
-		Left:  l,
-		Right: g,
-	}, nil
+	return j, nil
 }
 
 func (p *Parser) groupingElementList() (Layout, error) {
-	l, err := p.groupingElement()
+	j := Juxtaposition{}
+
+	e, err := p.groupingElement()
 	if err != nil {
 		return nil, fmt.Errorf("groupoing element: %w", err)
 	}
@@ -619,23 +597,16 @@ func (p *Parser) groupingElementList() (Layout, error) {
 		if err != nil {
 			break
 		}
+		j.Append(Concatenation{e, v})
 
-		e, err := p.groupingElement()
+		e, err = p.groupingElement()
 		if err != nil {
 			return nil, fmt.Errorf("grouping element: %w", err)
 		}
-
-		l = Juxtaposition{
-			Concentrated: true,
-			Left:         l,
-			Right: Juxtaposition{
-				Left:  Atom(v),
-				Right: e,
-			},
-		}
 	}
+	j.Append(e)
 
-	return l, nil
+	return j, nil
 }
 
 func (p *Parser) groupingElement() (Layout, error) {
@@ -655,32 +626,33 @@ func (p *Parser) searchCondition() (Layout, error) {
 }
 
 func (p *Parser) booleanValueExpression() (Layout, error) {
-	l, err := p.booleanTerm()
+	s := Stack{}
+
+	t, err := p.booleanTerm()
 	if err != nil {
 		return nil, fmt.Errorf("boolean term: %w", err)
 	}
+	s.Append(t)
 
 	for {
+		j := Juxtaposition{}
+
 		v, err := p.accept(keyword, "OR")
 		if err != nil {
 			break
 		}
+		j.Append(v)
 
-		t, err := p.booleanTerm()
+		t, err = p.booleanTerm()
 		if err != nil {
 			return nil, fmt.Errorf("boolean term: %w", err)
 		}
+		j.Append(t)
 
-		l = Stack{
-			Up: l,
-			Down: Juxtaposition{
-				Left:  Atom(v),
-				Right: t,
-			},
-		}
+		s.Append(j)
 	}
 
-	return l, nil
+	return s.Strip(), nil
 }
 
 func (p *Parser) booleanTerm() (Layout, error) {
@@ -688,24 +660,19 @@ func (p *Parser) booleanTerm() (Layout, error) {
 }
 
 func (p *Parser) booleanFactor() (Layout, error) {
-	var not bool
-	if _, err := p.accept(keyword, "NOT"); err == nil {
-		not = true
+	j := Juxtaposition{}
+
+	if v, err := p.accept(keyword, "NOT"); err == nil {
+		j.Append(v)
 	}
 
 	t, err := p.booleanTest()
 	if err != nil {
 		return nil, err
 	}
+	j.Append(t)
 
-	if not {
-		t = Juxtaposition{
-			Left:  Atom("NOT"),
-			Right: t,
-		}
-	}
-
-	return t, nil
+	return j, nil
 }
 
 func (p *Parser) booleanTest() (Layout, error) {
@@ -721,37 +688,39 @@ func (p *Parser) predicate() (Layout, error) {
 }
 
 func (p *Parser) comparisonPredicate() (Layout, error) {
+	j := Juxtaposition{}
+
 	l, err := p.rowValuePredicand()
 	if err != nil {
 		return nil, fmt.Errorf("row value predicand: %w", err)
 	}
+	j.Append(l)
 
 	r, err := p.comparisonPredicatePart2()
 	if err != nil {
 		return nil, fmt.Errorf("comparison predicate part 2: %w", err)
 	}
+	j.Append(r)
 
-	return Juxtaposition{
-		Left:  l,
-		Right: r,
-	}, nil
+	return j, nil
 }
 
 func (p *Parser) comparisonPredicatePart2() (Layout, error) {
+	j := Juxtaposition{}
+
 	o, err := p.compOp()
 	if err != nil {
 		return nil, fmt.Errorf("comp op: %w", err)
 	}
+	j.Append(o)
 
 	v, err := p.rowValuePredicand()
 	if err != nil {
 		return nil, fmt.Errorf("row value predicand: %w", err)
 	}
+	j.Append(v)
 
-	return Juxtaposition{
-		Left:  o,
-		Right: v,
-	}, nil
+	return j, nil
 }
 
 func (p *Parser) compOp() (Layout, error) {
@@ -777,7 +746,7 @@ func (p *Parser) equalsOperator() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) notEqualsOperator() (Layout, error) {
@@ -785,7 +754,7 @@ func (p *Parser) notEqualsOperator() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) lessThanOperator() (Layout, error) {
@@ -793,7 +762,7 @@ func (p *Parser) lessThanOperator() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) greaterThanOperator() (Layout, error) {
@@ -801,7 +770,7 @@ func (p *Parser) greaterThanOperator() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) lessThanOrEqualsOperator() (Layout, error) {
@@ -809,7 +778,7 @@ func (p *Parser) lessThanOrEqualsOperator() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) greaterThanOrEqualsOperator() (Layout, error) {
@@ -817,7 +786,7 @@ func (p *Parser) greaterThanOrEqualsOperator() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) rowValuePredicand() (Layout, error) {
@@ -848,7 +817,7 @@ func (p *Parser) qualifiedIdentifier() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) columnName() (Layout, error) {
@@ -856,7 +825,7 @@ func (p *Parser) columnName() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 func (p *Parser) correlationName() (Layout, error) {
@@ -864,18 +833,19 @@ func (p *Parser) correlationName() (Layout, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Atom(v), nil
+	return v, nil
 }
 
 // end of syntax
 
-func (p *Parser) accept(t tokenType, vals ...string) (string, error) {
+func (p *Parser) accept(t tokenType, vals ...string) (Layout, error) {
 	v, err := p.expect(t, vals...)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	p.current = p.lexer.Next()
-	return v, nil
+	a := Atom(v)
+	return &a, nil
 }
 
 func (p *Parser) expect(t tokenType, vals ...string) (string, error) {
