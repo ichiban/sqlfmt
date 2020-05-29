@@ -184,6 +184,8 @@ func (p *Parser) querySpecification() (Layout, error) {
 	}
 	s.Append(t)
 
+	s.AlignGutter()
+
 	return s, nil
 }
 
@@ -233,7 +235,7 @@ func (p *Parser) derivedColumn() (Layout, error) {
 		j.Append(a)
 	}
 
-	return j, nil
+	return j.Strip(), nil
 }
 
 func (p *Parser) asClause() (Layout, error) {
@@ -502,6 +504,12 @@ func (p *Parser) tablePrimary() (Layout, error) {
 		if err != nil {
 			return nil, err
 		}
+		j.Append(c)
+
+		return j, nil
+	}
+
+	if c, err := p.correlationName(); err == nil {
 		j.Append(c)
 	}
 
@@ -844,8 +852,7 @@ func (p *Parser) accept(t tokenType, vals ...string) (Layout, error) {
 		return nil, err
 	}
 	p.current = p.lexer.Next()
-	a := Atom(v)
-	return &a, nil
+	return Atom(v), nil
 }
 
 func (p *Parser) expect(t tokenType, vals ...string) (string, error) {

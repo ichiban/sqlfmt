@@ -8,7 +8,7 @@ import (
 
 type Layout interface {
 	Write(io.Writer, int) error
-	Width() int
+	Offset() int
 	Gutter() int
 }
 
@@ -19,7 +19,7 @@ func (a Atom) Write(w io.Writer, indent int) error {
 	return err
 }
 
-func (a Atom) Width() int {
+func (a Atom) Offset() int {
 	return len(a)
 }
 
@@ -30,6 +30,31 @@ func (a Atom) Gutter() int {
 type Stack []Layout
 
 func (s Stack) Write(w io.Writer, indent int) error {
+	for i, l := range s {
+		if err := l.Write(w, indent); err != nil {
+			return err
+		}
+		if i < len(s)-1 {
+			if _, err := fmt.Fprintf(w, "\n%s", strings.Repeat(" ", indent)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s Stack) Offset() int {
+	if len(s) == 0 {
+		return 0
+	}
+	return s[len(s)-1].Offset()
+}
+
+func (s Stack) Gutter() int {
+	return s[0].Gutter()
+}
+
+func (s Stack) AlignGutter() {
 	var m int
 	for _, l := range s {
 		g := l.Gutter()
@@ -38,29 +63,35 @@ func (s Stack) Write(w io.Writer, indent int) error {
 		}
 	}
 
-	for i, l := range s {
-		indent := indent + m - l.Gutter()
-		if i != 0 {
-			if _, err := fmt.Fprintf(w, "\n%s", strings.Repeat(" ", indent)); err != nil {
-				return err
-			}
-		}
-		if err := l.Write(w, indent); err != nil {
-			return err
-		}
+	for i := range s {
+		s[i] = gutterAligned(s[i], m)
 	}
-	return nil
 }
 
-func (s Stack) Width() int {
-	if len(s) == 0 {
-		return 0
+func gutterAligned(l Layout, g int) Layout {
+	switch l := l.(type) {
+	case Atom:
+		return Atom(fmt.Sprintf("%*s", g, l))
+	case Stack:
+		r := make(Stack, len(l))
+		copy(r, l)
+		for i := range r {
+			r[i] = gutterAligned(r[i], g)
+		}
+		return r
+	case Juxtaposition:
+		r := make(Juxtaposition, len(l))
+		copy(r, l)
+		r[0] = gutterAligned(r[0], g)
+		return r
+	case Concatenation:
+		r := make(Concatenation, len(l))
+		copy(r, l)
+		r[0] = gutterAligned(r[0], g)
+		return r
+	default:
+		panic(l)
 	}
-	return s[len(s)-1].Width()
-}
-
-func (s Stack) Gutter() int {
-	return s[0].Gutter()
 }
 
 func (s *Stack) Append(ls ...Layout) {
@@ -93,20 +124,20 @@ func (j Juxtaposition) Write(w io.Writer, indent int) error {
 		if err := l.Write(w, indent); err != nil {
 			return err
 		}
-		indent += l.Width()
+		indent += l.Offset()
 	}
 	return nil
 }
 
-func (j Juxtaposition) Width() int {
-	var w int
+func (j Juxtaposition) Offset() int {
+	var o int
 	for i, l := range j {
 		if i != 0 {
-			w++
+			o++
 		}
-		w += l.Width()
+		o += l.Offset()
 	}
-	return w
+	return o
 }
 
 func (j Juxtaposition) Gutter() int {
@@ -137,17 +168,17 @@ func (c Concatenation) Write(w io.Writer, indent int) error {
 		if err := l.Write(w, indent); err != nil {
 			return err
 		}
-		indent += l.Width()
+		indent += l.Offset()
 	}
 	return nil
 }
 
-func (c Concatenation) Width() int {
-	var w int
+func (c Concatenation) Offset() int {
+	var o int
 	for _, l := range c {
-		w += l.Width()
+		o += l.Offset()
 	}
-	return w
+	return o
 }
 
 func (c Concatenation) Gutter() int {

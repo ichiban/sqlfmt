@@ -14,8 +14,8 @@ func TestParser_DirectSQLStatement(t *testing.T) {
 		assert.Equal(t, Concatenation{
 			Stack{
 				Juxtaposition{Atom("SELECT"), Atom("model_num")},
-				Juxtaposition{Atom("FROM"), Atom("phones"), Atom("AS"), Atom("p")},
-				Juxtaposition{Atom("WHERE"), Concatenation{Atom("p"), Atom("."), Atom("release_date")}, Atom(">"), Atom("'2014-09-30'")},
+				Juxtaposition{Atom("  FROM"), Atom("phones"), Atom("AS"), Atom("p")},
+				Juxtaposition{Atom(" WHERE"), Concatenation{Atom("p"), Atom("."), Atom("release_date")}, Atom(">"), Atom("'2014-09-30'")},
 			},
 			Atom(";"),
 		}, l)
@@ -50,97 +50,52 @@ UNION ALL
 						Juxtaposition{
 							Atom("SELECT"),
 							Concatenation{
-								Juxtaposition{
-									Concatenation{
-										Atom("f"),
-										Atom("."),
-										Atom("species_name"),
-									},
-								},
+								Concatenation{Atom("f"), Atom("."), Atom("species_name")},
 								Atom(","),
 							},
 							Concatenation{
 								Juxtaposition{
-									Concatenation{
-										Atom("AVG"),
-										Atom("("),
-										Atom("f"),
-										Atom("."),
-										Atom("height"),
-										Atom(")"),
-									},
+									Concatenation{Atom("AVG"), Atom("("), Atom("f"), Atom("."), Atom("height"), Atom(")")},
 									Atom("AS"),
 									Atom("average_height"),
 								},
 								Atom(","),
 							},
-							Concatenation{
-								Atom("AVG"),
-								Atom("("),
-								Atom("f"),
-								Atom("."),
-								Atom("diameter"),
-								Atom(")"),
-							},
+							Concatenation{Atom("AVG"), Atom("("), Atom("f"), Atom("."), Atom("diameter"), Atom(")")},
 							Atom("AS"),
 							Atom("average_diameter"),
 						},
 						Juxtaposition{
-							Atom("FROM"),
+							Atom("  FROM"),
 							Atom("flora"),
 							Atom("AS"),
 							Atom("f"),
 						},
 						Juxtaposition{
-							Atom("WHERE"),
-							Stack{
-								Juxtaposition{
-									Concatenation{
-										Atom("f"),
-										Atom("."),
-										Atom("species_name"),
-									},
-									Atom("="),
-									Atom("'Banksia'"),
-								},
-								Juxtaposition{
-									Atom("OR"),
-									Concatenation{
-										Atom("f"),
-										Atom("."),
-										Atom("species_name"),
-									},
-									Atom("="),
-									Atom("'Sheoak'"),
-								},
-								Juxtaposition{
-									Atom("OR"),
-									Concatenation{
-										Atom("f"),
-										Atom("."),
-										Atom("species_name"),
-									},
-									Atom("="),
-									Atom("'Wattle'"),
-								},
-							},
+							Atom(" WHERE"),
+							Concatenation{Atom("f"), Atom("."), Atom("species_name")},
+							Atom("="),
+							Atom("'Banksia'"),
 						},
 						Juxtaposition{
-							Atom("GROUP"),
+							Atom("    OR"),
+							Concatenation{Atom("f"), Atom("."), Atom("species_name")},
+							Atom("="),
+							Atom("'Sheoak'"),
+						}, Juxtaposition{
+							Atom("    OR"),
+							Concatenation{Atom("f"), Atom("."), Atom("species_name")},
+							Atom("="),
+							Atom("'Wattle'"),
+						},
+						Juxtaposition{
+							Atom(" GROUP"),
 							Atom("BY"),
 							Concatenation{
-								Concatenation{
-									Atom("f"),
-									Atom("."),
-									Atom("species_name"),
-								},
+								Concatenation{Atom("f"), Atom("."), Atom("species_name")},
 								Atom(","),
 							},
-							Concatenation{
-								Atom("f"),
-								Atom("."),
-								Atom("observation_date"),
-							},
+							Concatenation{Atom("f"), Atom("."), Atom("observation_date")},
 						},
 					},
 					Atom(")"),
@@ -155,97 +110,53 @@ UNION ALL
 						Juxtaposition{
 							Atom("SELECT"),
 							Concatenation{
-								Juxtaposition{
-									Concatenation{
-										Atom("b"),
-										Atom("."),
-										Atom("species_name"),
-									},
-								},
+								Concatenation{Atom("b"), Atom("."), Atom("species_name")},
 								Atom(","),
 							},
 							Concatenation{
 								Juxtaposition{
-									Concatenation{
-										Atom("AVG"),
-										Atom("("),
-										Atom("b"),
-										Atom("."),
-										Atom("height"),
-										Atom(")"),
-									},
+									Concatenation{Atom("AVG"), Atom("("), Atom("b"), Atom("."), Atom("height"), Atom(")")},
 									Atom("AS"),
 									Atom("average_height"),
 								},
 								Atom(","),
 							},
-							Concatenation{
-								Atom("AVG"),
-								Atom("("),
-								Atom("b"),
-								Atom("."),
-								Atom("diameter"),
-								Atom(")"),
-							},
+							Concatenation{Atom("AVG"), Atom("("), Atom("b"), Atom("."), Atom("diameter"), Atom(")")},
 							Atom("AS"),
 							Atom("average_diameter"),
 						},
 						Juxtaposition{
-							Atom("FROM"),
+							Atom("  FROM"),
 							Atom("botanic_garden_flora"),
 							Atom("AS"),
 							Atom("b"),
 						},
 						Juxtaposition{
-							Atom("WHERE"),
-							Stack{
-								Juxtaposition{
-									Concatenation{
-										Atom("b"),
-										Atom("."),
-										Atom("species_name"),
-									},
-									Atom("="),
-									Atom("'Banksia'"),
-								},
-								Juxtaposition{
-									Atom("OR"),
-									Concatenation{
-										Atom("b"),
-										Atom("."),
-										Atom("species_name"),
-									},
-									Atom("="),
-									Atom("'Sheoak'"),
-								},
-								Juxtaposition{
-									Atom("OR"),
-									Concatenation{
-										Atom("b"),
-										Atom("."),
-										Atom("species_name"),
-									},
-									Atom("="),
-									Atom("'Wattle'"),
-								},
-							},
+							Atom(" WHERE"),
+							Concatenation{Atom("b"), Atom("."), Atom("species_name")},
+							Atom("="),
+							Atom("'Banksia'"),
 						},
 						Juxtaposition{
-							Atom("GROUP"),
+							Atom("    OR"),
+							Concatenation{Atom("b"), Atom("."), Atom("species_name")},
+							Atom("="),
+							Atom("'Sheoak'"),
+						},
+						Juxtaposition{
+							Atom("    OR"),
+							Concatenation{Atom("b"), Atom("."), Atom("species_name")},
+							Atom("="),
+							Atom("'Wattle'"),
+						},
+						Juxtaposition{
+							Atom(" GROUP"),
 							Atom("BY"),
 							Concatenation{
-								Concatenation{
-									Atom("b"),
-									Atom("."),
-									Atom("species_name"),
-								},
+								Concatenation{Atom("b"), Atom("."), Atom("species_name")},
 								Atom(","),
 							},
-							Concatenation{
-								Atom("b"),
-								Atom("."),
-								Atom("observation_date"),
-							},
+							Concatenation{Atom("b"), Atom("."), Atom("observation_date")},
 						},
 					},
 					Atom(")"),
