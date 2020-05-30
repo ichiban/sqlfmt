@@ -76,6 +76,8 @@ func (p *Parser) queryExpressionBody() (Layout, error) {
 		s.Append(j, t)
 	}
 
+	s.AlignGutter()
+
 	return s, nil
 }
 

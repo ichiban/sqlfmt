@@ -87,7 +87,17 @@ func gutterAligned(l Layout, g int) Layout {
 	case Concatenation:
 		r := make(Concatenation, len(l))
 		copy(r, l)
-		r[0] = gutterAligned(r[0], g)
+
+		var d int
+		for _, e := range r[1:] {
+			d += e.Gutter()
+			switch e.(type) {
+			case Atom, Concatenation:
+			default:
+				break
+			}
+		}
+		r[0] = gutterAligned(r[0], g-d)
 		return r
 	default:
 		panic(l)
@@ -184,7 +194,12 @@ func (c Concatenation) Offset() int {
 func (c Concatenation) Gutter() int {
 	var g int
 	for _, l := range c {
-		g += l.Gutter()
+		switch l := l.(type) {
+		case Atom, Concatenation:
+			g += l.Gutter()
+		default:
+			return g + l.Gutter()
+		}
 	}
 	return g
 }

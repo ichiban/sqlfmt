@@ -101,7 +101,7 @@ UNION ALL
 					Atom(")"),
 				},
 				Juxtaposition{
-					Atom("UNION"),
+					Atom("  UNION"),
 					Atom("ALL"),
 				},
 				Concatenation{
